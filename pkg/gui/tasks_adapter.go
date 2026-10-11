@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (gui *Gui) newCmdTask(view *gocui.View, cmd *exec.Cmd, prefix types.Prefix) error {
+func (gui *Gui) newCmdTask(view *gocui.View, cmd *exec.Cmd, prefix types.Prefix, contentTag func() any) error {
 	cmdStr := strings.Join(cmd.Args, " ")
 	gui.c.Log.WithField(
 		"command",
@@ -46,7 +46,7 @@ func (gui *Gui) newCmdTask(view *gocui.View, cmd *exec.Cmd, prefix types.Prefix)
 		}
 
 		spec := renderSpec{view: view, cmd: cmd, width: gui.renderWidth(view)}
-		return gui.newTaskForRender(reservation, spec, prefix, cmdStr, gui.plainRender)
+		return gui.newTaskForRender(reservation, spec, prefix, contentTag, cmdStr, gui.plainRender)
 	})
 
 	return nil

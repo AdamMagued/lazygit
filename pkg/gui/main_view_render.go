@@ -34,7 +34,7 @@ type renderSpec struct {
 // newRenderTask renders cmd's output into view, through the diff renderer the
 // user has configured. The renderer lays its rendering out to the width of the
 // view, which only the layout settles, so the task is created after it.
-func (gui *Gui) newRenderTask(view *gocui.View, cmd *exec.Cmd, prefix types.Prefix) error {
+func (gui *Gui) newRenderTask(view *gocui.View, cmd *exec.Cmd, prefix types.Prefix, contentTag func() any) error {
 	// Ask whatever renders the diff to state, in an OSC 1717 record per line,
 	// which line of which file it is rendering. This lets us act on the line the
 	// user is pointing at even when the rendering no longer looks like a diff.
@@ -47,7 +47,7 @@ func (gui *Gui) newRenderTask(view *gocui.View, cmd *exec.Cmd, prefix types.Pref
 
 	if gui.stateAccessor.GetDiffRendererConfigManager().GetDiffRendererType() == config.DiffRendererType_RawGit {
 		// If we're not using a custom diff renderer, then we don't need to use a pty
-		return gui.newCmdTask(view, cmd, prefix)
+		return gui.newCmdTask(view, cmd, prefix, contentTag)
 	}
 
 	// The key the render is remembered under says which diff it is of, so that a
@@ -116,7 +116,7 @@ func (gui *Gui) newRenderTask(view *gocui.View, cmd *exec.Cmd, prefix types.Pref
 		if oscommands.RendersThroughAPipe() {
 			run = gui.pipedRender
 		}
-		return gui.newTaskForRender(reservation, spec, prefix, cmdStr, run)
+		return gui.newTaskForRender(reservation, spec, prefix, contentTag, cmdStr, run)
 	})
 
 	return nil
@@ -150,7 +150,9 @@ type runRender func(spec renderSpec) (startRender, onCloseRender)
 // view, running the command the given way. The task takes the place that the
 // reservation holds among the view's tasks. key names what is rendered, so that
 // a re-render of the same content can be told from a render of other content.
-func (gui *Gui) newTaskForRender(reservation tasks.TaskReservation, spec renderSpec, prefix types.Prefix, key string, run runRender) error {
+func (gui *Gui) newTaskForRender(
+	reservation tasks.TaskReservation, spec renderSpec, prefix types.Prefix, contentTag func() any, key string, run runRender,
+) error {
 	setColumnsEnvVar(spec.cmd, spec.width)
 
 	start, onClose := run(spec)
@@ -164,7 +166,8 @@ func (gui *Gui) newTaskForRender(reservation tasks.TaskReservation, spec renderS
 
 	manager := gui.getManager(spec.view)
 	linesToRead := gui.linesToReadFromCmdTask(spec.view)
-	return manager.NewReservedTask(reservation, manager.NewCmdTask(start, producePrefix, linesToRead, onClose), key)
+	return manager.NewReservedTask(reservation,
+		manager.NewCmdTask(start, producePrefix, contentTag, linesToRead, onClose), key)
 }
 
 // pipedRender feeds the diff renderer the command's output through a pipe.
